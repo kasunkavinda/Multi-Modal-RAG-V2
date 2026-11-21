@@ -1,0 +1,158 @@
+<!doctype html>
+<!-- Fallback UI (no build step): served by the API at /ui. Same features as web/ (Next.js):
+     query box + examples, answer panel with the real artefact, citation, sources panel, status badge. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual Answers - multimodal RAG</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1d2430;--muted:#5d6878;--line:#dde2e8;--accent:#1f5fbf;--ok:#1d8a4e;--warn:#b26b00;--bad:#c23934;--fig:#7a4cc2;--tab:#0f7c8c;--txt:#56606e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1280px;margin:0 auto;padding:20px}h1{margin:0;font-size:24px}h2{margin:0 0 8px;font-size:16px}
+.muted{color:var(--muted);margin:2px 0}.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.top{display:flex;justify-content:space-between;gap:12px;margin-bottom:14px}.top-right{display:flex;gap:12px;align-items:center;position:relative}
+form{display:flex;gap:8px}input{flex:1;padding:10px 12px;font-size:16px;border:1px solid var(--line);border-radius:8px;min-width:0}
+button,select{padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;font-size:14px}
+button[type=submit]{background:var(--accent);color:#fff;border-color:var(--accent)}button:disabled{opacity:.55}
+.examples{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;font-size:13px;color:var(--muted);align-items:center}.chip{border-radius:16px;padding:4px 10px;font-size:13px;text-align:left}
+.type{display:inline-block;font-size:11px;font-weight:600;text-transform:uppercase;padding:1px 6px;border-radius:4px;color:#fff;background:var(--txt)}
+.type-figure{background:var(--fig)}.type-table{background:var(--tab)}.type-abstain{background:var(--bad)}
+.results{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:14px;align-items:start}
+@media(max-width:900px){.results{grid-template-columns:1fr}form{flex-wrap:wrap}}
+.answer-text{font-size:16px}.cite{font-size:11.5px;background:#e7effb;color:var(--accent);border-radius:4px;padding:0 5px;font-family:ui-monospace,monospace}
+.artefact{border:1px solid var(--line);border-radius:8px;padding:10px;background:#fcfcfd}.cap{font-weight:600;margin-bottom:8px}
+img.figure{max-width:100%;max-height:70vh;display:block;margin:0 auto;border:1px solid var(--line);background:#fff}
+.tw{overflow:auto;max-height:60vh}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top}
+th{background:#eef1f5;position:sticky;top:0}tr.hl td{background:#fff4c7}
+blockquote{margin:0;padding:8px 12px;border-left:4px solid var(--accent);background:#f4f7fc;white-space:pre-wrap}
+.citation{margin-top:10px;padding:8px 10px;background:#eef6f0;border-radius:6px;border:1px solid #cfe6d7}.timings{margin-top:8px;font-size:12px;color:var(--muted)}
+.warn-box{background:#fff5e6;border:1px solid #f1d3a6;border-radius:6px;padding:6px 10px;font-size:13px}.abstain{border-left:4px solid var(--warn)}.error{border-left:4px solid var(--bad)}
+.sources ol{list-style:none;margin:0;padding:0}.sources li{border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px}
+.sources li.cited{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok) inset;background:#f3fbf6}.sources li.dropped{opacity:.7;background:#fbf3f3}
+.sh{display:flex;gap:6px;align-items:center;font-size:13px}.score{margin-left:auto;font-family:ui-monospace,monospace;font-size:12px}
+.tag{font-size:11px;background:var(--ok);color:#fff;border-radius:4px;padding:0 5px}.sc{font-size:13px;word-break:break-all}.sc a{color:var(--accent)}
+.drop{font-size:12px;color:var(--bad)}.pv{font-size:12px;color:var(--muted);max-height:3.6em;overflow:hidden}
+.badge{border-radius:16px;font-weight:600}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#999;margin-right:6px}
+.healthy .dot{background:var(--ok)}.degraded .dot{background:var(--warn)}.down .dot{background:var(--bad)}
+#panel{position:absolute;right:0;top:42px;width:440px;z-index:10;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);font-size:13px;display:none}
+.fix{color:var(--muted);font-size:13px}.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s .8s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes s{to{transform:rotate(360deg)}}code{font-size:12.5px;background:#eef1f5;padding:1px 4px;border-radius:4px}
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div><h1>Manual Answers</h1><p class="muted">Ask a question; get the real figure or table rows back, with the page they came from.</p></div>
+    <div class="top-right"><span id="lat" class="muted"></span><button id="badge" class="badge"><span class="dot"></span><span id="blabel">Checking…</span></button><div id="panel"></div></div>
+  </header>
+  <section class="card">
+    <form id="f"><input id="q" maxlength="2000" placeholder="Ask about a component, a diagram or a spec… e.g. show the cylinder block assembly" aria-label="Question">
+      <select id="flt" aria-label="Content type filter"><option value="">Any type</option><option value="figure">Figures</option><option value="table">Tables</option><option value="text">Text</option></select>
+      <button type="submit" id="go">Ask</button></form>
+    <div class="examples" id="ex"></div>
+  </section>
+  <div id="out"></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let health = null;
+
+async function api(path, opts) {
+  let r;
+  try { r = await fetch(path, { cache: "no-store", ...opts }); }
+  catch { throw { kind: "network", message: "Cannot reach the API.", fix: "Start it: uvicorn app.server:app --port 8000" }; }
+  const body = await r.json().catch(() => null);
+  if (r.ok) return body;
+  if (body && body.error) throw body.error;
+  throw { kind: "unknown", message: `API error ${r.status}: ${body?.detail ?? r.statusText}` };
+}
+
+async function loadHealth(live = false) {
+  try {
+    health = await api("/health" + (live ? "?live=true" : ""));
+    $("badge").className = "badge " + health.status;
+    $("blabel").textContent = health.status === "healthy" ? "Healthy" : `Degraded (${health.problems.length})`;
+  } catch (e) { health = null; $("badge").className = "badge down"; $("blabel").textContent = "API unreachable"; }
+  renderPanel();
+}
+function renderPanel() {
+  const p = $("panel");
+  if (!health) { p.innerHTML = "<p>API unreachable.</p>"; return; }
+  const units = health.index?.units_by_type ? Object.entries(health.index.units_by_type).map(([t, n]) => `${n} ${t}`).join(" · ") : "no index";
+  p.innerHTML = (health.problems.length ? health.problems.map((x) => `<p><b>${esc(x.kind)}:</b> ${esc(x.message)}${x.fix ? `<br><span class="fix">Fix: ${esc(x.fix)}</span>` : ""}</p>`).join("") : "<p>All checks passed.</p>")
+    + `<p><b>Vector store:</b> ${esc(health.vector_backend)}<br><b>Index:</b> ${esc(units)}</p>`
+    + Object.entries(health.models).map(([r, m]) => `<div><b>${esc(r)}</b>: <code>${esc(m)}</code></div>`).join("")
+    + `<p><button onclick="loadHealth(false)">Refresh</button> <button onclick="loadHealth(true)" title="One tiny call per model">Check models live</button></p>`;
+}
+$("badge").onclick = () => { const p = $("panel"); p.style.display = p.style.display === "block" ? "none" : "block"; };
+
+async function loadExamples() {
+  try {
+    const { examples } = await api("/examples");
+    $("ex").innerHTML = "<span>Try:</span>" + examples.map((e, i) =>
+      `<button class="chip" data-i="${i}"><span class="type type-${esc(e.type)}">${esc(e.type)}</span> ${esc(e.question.length > 90 ? e.question.slice(0, 88) + "…" : e.question)}</button>`).join("");
+    $("ex").querySelectorAll("button").forEach((b) => b.onclick = () => { $("q").value = examples[b.dataset.i].question; ask(); });
+  } catch {}
+}
+
+function answerText(t) { return esc(t).replace(/\[([^\]]+)\]/g, '<span class="cite">$1</span>'); }
+
+function tableHtml(t, hl) {
+  const h = new Set(hl);
+  return `<div class="tw"><table><thead><tr><th>#</th>${t.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>`
+    + t.rows.map((r, i) => `<tr class="${h.has(i) ? "hl" : ""}"><td>${i + 1}</td>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")
+    + "</tbody></table></div>";
+}
+
+function render(r) {
+  let a = "";
+  if (r.status === "abstained") {
+    a = `<section class="card abstain"><h2>No sourced answer</h2><p>${esc(r.abstain_reason)}</p><p class="muted">The system refuses to answer rather than cite nothing.</p></section>`;
+  } else {
+    const art = r.artefact;
+    let body = "";
+    if (art) {
+      body += `<div class="artefact">${art.caption ? `<div class="cap">${esc(art.caption)}</div>` : ""}`;
+      if (art.type === "figure") body += `<a href="${esc(art.image_url)}" target="_blank"><img class="figure" src="${esc(art.image_url)}" alt="figure ${esc(art.unit_id)}"></a>`;
+      if (art.type === "table" && art.table) body += tableHtml(art.table, art.highlight_rows) + (art.image_url ? `<p><a href="${esc(art.image_url)}" target="_blank">Original table image</a></p>` : "");
+      if (art.type === "text") body += `<blockquote>${esc(art.text)}</blockquote>`;
+      body += "</div>";
+    }
+    a = `<section class="card"><div><span class="type type-${esc(r.answer_type)}">${esc(r.answer_type)}</span> ${r.status === "partial" ? '<span class="muted">artefact only</span>' : ""}</div>
+      ${r.answer ? `<p class="answer-text">${answerText(r.answer)}</p>` : ""}
+      ${r.generation_error ? `<p class="warn-box">${esc(r.generation_error)}</p>` : ""}${body}
+      ${r.citation ? `<div class="citation"><b>Source:</b> ${esc(r.citation.document_id)} &gt; page ${r.citation.page} &gt; <code>${esc(r.citation.unit_id)}</code></div>` : ""}
+      <div class="timings">retrieval ${r.timings.retrieval_ms.toFixed(0)} ms · generation ${r.timings.generation_ms.toFixed(0)} ms · total ${r.timings.total_ms.toFixed(0)} ms · ${r.model_calls} model calls</div></section>`;
+  }
+  const s = `<section class="card sources"><h2>Sources (${r.sources.length})</h2><ol>` + r.sources.map((x) =>
+    `<li class="${x.cited ? "cited" : ""} ${x.sourced ? "" : "dropped"}"><div class="sh"><span class="muted">#${x.rank}</span><span class="type type-${esc(x.type)}">${esc(x.type)}</span>${x.cited ? '<span class="tag">cited</span>' : ""}<span class="score">${x.score.toFixed(3)}</span></div>
+     <div class="sc">${x.sourced ? `<a href="/artefact/${esc(x.unit_id)}" target="_blank">${esc(x.citation)}</a>` : `<s>${esc(x.citation)}</s>`}</div>
+     ${x.sourced ? "" : `<div class="drop">dropped: ${esc(x.drop_reason)}</div>`}<div class="pv">${esc(x.preview)}</div></li>`).join("") + "</ol></section>";
+  $("out").innerHTML = `<div class="results">${a}${s}</div>`;
+}
+
+async function ask() {
+  const q = $("q").value.trim();
+  if (!q) return;
+  $("go").disabled = true;
+  $("out").innerHTML = '<div class="card"><span class="spinner"></span>Retrieving sources and preparing a grounded answer… (free-tier models can take 10-30 s)</div>';
+  const t0 = performance.now();
+  try {
+    const types = $("flt").value ? [$("flt").value] : null;
+    render(await api("/query", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, types }) }));
+  } catch (e) {
+    const title = e.kind === "configuration" ? "Configuration problem" : e.kind === "upstream" ? "Model provider problem" : "Request failed";
+    $("out").innerHTML = `<div class="card error"><h2>${title}</h2><p>${esc(e.message)}${e.model ? ` (model: ${esc(e.model)})` : ""}</p>${e.fix ? `<p class="fix">Fix: ${esc(e.fix)}</p>` : ""}</div>`;
+    loadHealth();
+  } finally {
+    $("lat").textContent = `last answer ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+    $("go").disabled = false;
+  }
+}
+$("f").onsubmit = (e) => { e.preventDefault(); ask(); };
+loadHealth(); loadExamples();
+</script>
+</body>
+</html>

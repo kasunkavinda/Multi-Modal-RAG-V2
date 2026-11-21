@@ -1,0 +1,15 @@
+# RAG service - light deps only, no local models, no GPU.
+httpx>=0.27
+pydantic>=2.9
+python-dotenv>=1.0
+pymupdf>=1.25          # PDF parsing, image export, page render, table finder
+pillow>=10.4
+numpy>=2.1
+qdrant-client>=1.12
+fastapi>=0.115
+uvicorn>=0.32
+rank-bm25>=0.2.2       # lexical fusion for exact identifiers (E5.2)
+pyarrow>=18            # ViDoRe parquet labels
+huggingface_hub>=0.26  # dataset download
+pytesseract>=0.3.13    # optional: only used if the tesseract binary is installed
+pytest>=8

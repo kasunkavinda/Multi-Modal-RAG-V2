@@ -1,0 +1,16 @@
+# secrets
+.env
+.env.local
+!.env.example
+# data, artefacts, caches, index, reports (re-creatable)
+rag/data/
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# web
+web/node_modules/
+web/.next/
+web/next-env.d.ts
+web/*.tsbuildinfo
